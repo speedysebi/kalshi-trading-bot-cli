@@ -4,29 +4,22 @@ on:
   push:
     branches: [main]
   pull_request:
-    types: [opened, synchronize, reopened, labeled]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  checks:
-    if: github.event.action != 'labeled' || github.event.label.name == 'run-ci'
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - task: typecheck
-            command: bun run typecheck
-          - task: test
-            command: bun test
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
-
-      - name: Install dependencies
-        run: bun install --frozen-lockfile --ignore-scripts
-
-      - name: Run ${{ matrix.task }}
-        run: ${{ matrix.command }}
+  ci:
+    # Vendored from speedysebi/cicd-template@v1 because this public repo
+    # cannot call reusable workflows in that private repository.
+    uses: ./.github/workflows/node-ci.yml
+    with:
+      package-manager: bun
+      install-command: bun install --frozen-lockfile --ignore-scripts
+      scripts: "typecheck test"
+      extra-command: npm pack --dry-run
