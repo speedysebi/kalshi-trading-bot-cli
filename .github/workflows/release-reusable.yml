@@ -1,0 +1,146 @@
+# Reusable "release on version bump" workflow.
+#
+# Reads the project's version, and if no tag exists for it yet, creates the
+# tag and a GitHub Release with generated notes. If the tag already exists it
+# does nothing and reports released=false, so it is safe to run on every push
+# to main: a release happens only when you bump the version.
+#
+# Chain publish/deploy jobs on its outputs (tags pushed with GITHUB_TOKEN do
+# not trigger other workflows, so outputs are the reliable way to continue).
+#
+# Docs: docs/workflows/release.md
+name: Release
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: "Explicit version; empty reads it from version-file"
+        type: string
+        default: ""
+      version-file:
+        description: "package.json, pyproject.toml, Cargo.toml, gradle.properties, pom.xml or VERSION; empty auto-detects"
+        type: string
+        default: ""
+      working-directory:
+        type: string
+        default: "."
+      tag-prefix:
+        type: string
+        default: v
+      prerelease:
+        type: boolean
+        default: false
+      draft:
+        type: boolean
+        default: false
+      artifact-name:
+        description: "Artifact from this run whose files are attached to the release"
+        type: string
+        default: ""
+      dry-run:
+        description: "Resolve the version and tag but do not create anything"
+        type: boolean
+        default: false
+    outputs:
+      released:
+        description: "'true' if a new release was created"
+        value: ${{ jobs.release.outputs.released }}
+      version:
+        value: ${{ jobs.release.outputs.version }}
+      tag:
+        value: ${{ jobs.release.outputs.tag }}
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    outputs:
+      released: ${{ steps.publish.outputs.released || 'false' }}
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+    defaults:
+      run:
+        shell: bash
+        working-directory: ${{ inputs.working-directory }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Resolve version
+        id: version
+        env:
+          VERSION: ${{ inputs.version }}
+          FILE: ${{ inputs.version-file }}
+          PREFIX: ${{ inputs.tag-prefix }}
+        run: |
+          v="$VERSION"
+          if [ -z "$v" ]; then
+            f="$FILE"
+            if [ -z "$f" ]; then
+              for c in package.json pyproject.toml Cargo.toml gradle.properties pom.xml VERSION; do
+                if [ -f "$c" ]; then f="$c"; break; fi
+              done
+            fi
+            if [ -z "$f" ] || [ ! -f "$f" ]; then
+              echo "::error::No version file found. Set version or version-file."; exit 1
+            fi
+            case "$(basename "$f")" in
+              package.json)      v=$(node -p "require('./$f').version") ;;
+              pyproject.toml)    v=$(python3 -c "import tomllib,sys; d=tomllib.load(open(sys.argv[1],'rb')); print(d.get('project',{}).get('version') or d['tool']['poetry']['version'])" "$f") ;;
+              Cargo.toml)        v=$(python3 -c "import tomllib,sys; print(tomllib.load(open(sys.argv[1],'rb'))['package']['version'])" "$f") ;;
+              gradle.properties) v=$(grep -E '^version[[:space:]]*=' "$f" | head -1 | cut -d= -f2 | tr -d '[:space:]') ;;
+              pom.xml)           v=$(mvn -B -q -f "$f" help:evaluate -Dexpression=project.version -DforceStdout) ;;
+              *)                 v=$(tr -d '[:space:]' < "$f") ;;
+            esac
+            echo "Read version '$v' from $f"
+          fi
+          if [ -z "$v" ] || [ "$v" = "undefined" ]; then
+            echo "::error::Could not determine a version"; exit 1
+          fi
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          echo "tag=${PREFIX}${v}" >> "$GITHUB_OUTPUT"
+
+      - name: Download release artifact
+        if: inputs.artifact-name != '' && !inputs.dry-run
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: ${{ inputs.artifact-name }}
+          path: ${{ runner.temp }}/release-assets
+
+      - name: Create tag and release
+        id: publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+          DRY_RUN: ${{ inputs.dry-run }}
+          PRERELEASE: ${{ inputs.prerelease }}
+          DRAFT: ${{ inputs.draft }}
+          ASSETS_DIR: ${{ inputs.artifact-name != '' && format('{0}/release-assets', runner.temp) || '' }}
+        run: |
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$TAG" >/dev/null 2>&1; then
+            echo "::notice::$TAG already exists - bump the version to release."
+            echo "released=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ "$DRY_RUN" = "true" ]; then
+            echo "::notice::Dry run: would create release $TAG at $GITHUB_SHA"
+            echo "released=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          args=(--repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "$TAG" --generate-notes)
+          [ "$PRERELEASE" = "true" ] && args+=(--prerelease)
+          [ "$DRAFT" = "true" ] && args+=(--draft)
+          files=()
+          if [ -n "$ASSETS_DIR" ]; then
+            while IFS= read -r -d '' f; do files+=("$f"); done < <(find "$ASSETS_DIR" -type f -print0)
+          fi
+          gh release create "$TAG" "${args[@]}" "${files[@]}"
+          echo "released=true" >> "$GITHUB_OUTPUT"
+          echo "### Released $TAG" >> "$GITHUB_STEP_SUMMARY"

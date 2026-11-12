@@ -1,46 +1,44 @@
 name: Release Tag
 
 on:
-  push:
-    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-tag
+  cancel-in-progress: false
 
 jobs:
-  tag:
-    runs-on: ubuntu-latest
+  checks:
+    if: github.ref == 'refs/heads/main'
+    uses: ./.github/workflows/node-ci.yml
+    with:
+      package-manager: bun
+      install-command: bun install --frozen-lockfile --ignore-scripts
+      scripts: "typecheck test"
+      extra-command: npm pack --dry-run
+
+  release:
+    needs: checks
     permissions:
       contents: write
+    uses: ./.github/workflows/release-reusable.yml
+    with:
+      version-file: package.json
+
+  publish:
+    needs: release
+    if: needs.release.outputs.released == 'true'
+    runs-on: ubuntu-latest
+    permissions:
       actions: write
+      contents: read
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 2
-
-      - name: Check for version change
-        id: version
-        run: |
-          CURRENT=$(jq -r '.version' package.json)
-          PREVIOUS=$(git show HEAD~1:package.json | jq -r '.version')
-          echo "current=$CURRENT" >> "$GITHUB_OUTPUT"
-          echo "previous=$PREVIOUS" >> "$GITHUB_OUTPUT"
-          if [ "$CURRENT" != "$PREVIOUS" ]; then
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Create release tag
-        if: steps.version.outputs.changed == 'true'
+      - name: Dispatch npm publication for the new tag
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          VERSION="v${{ steps.version.outputs.current }}"
-          # Skip if tag already exists (e.g. cut from a feature branch before merge)
-          if git ls-remote --exit-code --tags origin "$VERSION" >/dev/null 2>&1; then
-            echo "Tag $VERSION already exists on origin — skipping."
-            exit 0
-          fi
-          git tag "$VERSION"
-          git push origin "$VERSION"
-          gh release create "$VERSION" --generate-notes --title "$VERSION"
-          # GITHUB_TOKEN tag pushes don't trigger other workflows; dispatch publish explicitly.
-          gh workflow run publish-npm.yml --ref "$VERSION"
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ needs.release.outputs.tag }}
+        run: gh workflow run publish-npm.yml --repo "$GH_REPO" --ref "$TAG"
