@@ -1,0 +1,61 @@
+# Reusable lint for GitHub Actions workflows themselves.
+#
+#   actionlint - syntax, expression types, shellcheck on `run:` scripts
+#   zizmor     - security audit (template injection, excessive permissions,
+#                unpinned actions, credential persistence, ...)
+#
+# Findings show up as annotations on the run and the PR diff. Results are not
+# uploaded to the Security tab because that needs GitHub Advanced Security,
+# which private repos on free plans don't have.
+#
+# Docs: docs/workflows/workflow-lint.md
+name: Workflow lint
+
+on:
+  workflow_call:
+    inputs:
+      actionlint-version:
+        type: string
+        default: "1.7.12"
+      zizmor:
+        description: "Run the zizmor security audit"
+        type: boolean
+        default: true
+      zizmor-min-severity:
+        description: "unknown, informational, low, medium or high"
+        type: string
+        default: low
+
+permissions:
+  contents: read
+
+jobs:
+  actionlint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Run actionlint
+        env:
+          VERSION: ${{ inputs.actionlint-version }}
+        run: |
+          bash <(curl -fsSL "https://raw.githubusercontent.com/rhysd/actionlint/v${VERSION}/scripts/download-actionlint.bash") "$VERSION" "$RUNNER_TEMP"
+          "$RUNNER_TEMP/actionlint" -color
+
+  zizmor:
+    if: inputs.zizmor
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: zizmorcore/zizmor-action@45d7276c9ca790aabd705e31ca99c6185c3e76dd # v0.8.1
+        with:
+          advanced-security: false
+          annotations: true
+          min-severity: ${{ inputs.zizmor-min-severity }}
