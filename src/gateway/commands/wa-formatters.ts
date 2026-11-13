@@ -68,6 +68,7 @@ export function formatPortfolioForWhatsApp(data: PortfolioData): string {
     lines.push(`Cash: $${(acct.cashBalance / 100).toFixed(2)}`);
     lines.push(`Portfolio: $${(acct.portfolioValue / 100).toFixed(2)}`);
     lines.push(`Exposure: $${(acct.openExposure / 100).toFixed(2)}`);
+    lines.push(`Exposure share: ${acct.exposureRatio === null ? '--' : `${(acct.exposureRatio * 100).toFixed(1)}%`}`);
     lines.push(`Available: $${(acct.available / 100).toFixed(2)}`);
   } else {
     lines.push(`Account data unavailable`);

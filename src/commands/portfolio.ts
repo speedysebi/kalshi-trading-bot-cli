@@ -14,6 +14,13 @@ import type { PerformanceStats } from '../eval/performance.js';
 
 export type { PerformanceStats };
 
+/** Open market exposure as a share of the venue-reported portfolio value. */
+export function exposureRatio(openExposure: number, portfolioValue: number): number | null {
+  return Number.isFinite(openExposure) && Number.isFinite(portfolioValue) && portfolioValue > 0
+    ? openExposure / portfolioValue
+    : null;
+}
+
 export interface PositionView {
   ticker: string;
   direction: string;
@@ -31,6 +38,8 @@ export interface PortfolioData {
     cashBalance: number;
     portfolioValue: number;
     openExposure: number;
+    /** Fraction of portfolio value committed to open market exposure. */
+    exposureRatio: number | null;
     available: number;
     positionsCount: number;
   } | null;
@@ -98,6 +107,7 @@ export async function handlePortfolio(args: ParsedArgs): Promise<CLIResponse<Por
           cashBalance: bankroll.cashBalance,
           portfolioValue: bankroll.portfolioValue,
           openExposure: bankroll.openExposure,
+          exposureRatio: exposureRatio(bankroll.openExposure, bankroll.portfolioValue),
           available: bankroll.availableBankroll,
           // From the venue, like the dollar lines above it: the table counts only
           // positions this CLI opened, so it misses ones opened on kalshi.com.
@@ -123,6 +133,7 @@ export async function handlePortfolio(args: ParsedArgs): Promise<CLIResponse<Por
             cash_balance: bankroll.cashBalance,
             portfolio_value: bankroll.portfolioValue,
             open_exposure: bankroll.openExposure,
+            exposure_ratio: exposureRatio(bankroll.openExposure, bankroll.portfolioValue),
             available: bankroll.availableBankroll,
             positions_count: bankroll.openPositions,
           },
@@ -166,6 +177,9 @@ export function formatPortfolioHuman(data: PortfolioData): string {
     lines.push(`    Cash Balance:    $${(data.accountSummary.cashBalance / 100).toFixed(2)}`);
     lines.push(`    Portfolio Value: $${(data.accountSummary.portfolioValue / 100).toFixed(2)}`);
     lines.push(`    Open Exposure:   $${(data.accountSummary.openExposure / 100).toFixed(2)}`);
+    lines.push(`    Exposure Share:  ${data.accountSummary.exposureRatio === null
+      ? '--'
+      : `${(data.accountSummary.exposureRatio * 100).toFixed(1)}%`}`);
     lines.push(`    Available:       $${(data.accountSummary.available / 100).toFixed(2)}`);
     lines.push(`    Positions:       ${data.accountSummary.positionsCount}`);
   } else {
