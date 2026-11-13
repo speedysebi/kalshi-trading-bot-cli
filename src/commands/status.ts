@@ -1,6 +1,19 @@
 import { callKalshiApi } from '../tools/kalshi/api.js';
 import { PROVIDERS } from '../providers.js';
 import { getDefaultModelForProvider } from '../utils/model.js';
+import { getBotSetting } from '../utils/bot-config.js';
+
+/** Keep the live/demo and kill-switch warnings together across status views. */
+export function formatSafetyStatus(demo: boolean, killSwitch: boolean, reason?: string): string[] {
+  return [
+    demo
+      ? '⚠ DEMO EXCHANGE — orders use simulated funds'
+      : '⚠ LIVE EXCHANGE — confirmed orders can use real funds',
+    killSwitch
+      ? `⛔ Kill switch ACTIVE${reason ? ` — ${reason}` : ''} (new orders blocked)`
+      : '✓ Kill switch inactive',
+  ];
+}
 
 /**
  * Verify setup: check API keys, exchange connectivity, and optional services.
@@ -58,13 +71,20 @@ export async function handleStatus(): Promise<string> {
   const hasTavily = !!process.env.TAVILY_API_KEY;
   lines.push(hasTavily ? '✓ TAVILY_API_KEY set (web search enabled)' : '  TAVILY_API_KEY not set (web search disabled — optional)');
 
-  // 6. Demo mode
-  if (process.env.KALSHI_USE_DEMO === 'true') {
-    lines.push('⚠ KALSHI_USE_DEMO=true — using demo environment (no real money)');
-  }
+  // 6. Exchange mode and local order halt
+  const killSwitch = getBotSetting('mandate.kill_switch') === true;
+  const killReason = getBotSetting('mandate.kill_reason');
+  lines.push(...formatSafetyStatus(
+    process.env.KALSHI_USE_DEMO === 'true',
+    killSwitch,
+    typeof killReason === 'string' ? killReason : undefined,
+  ));
+  if (killSwitch) allGood = false;
 
   lines.push('');
-  lines.push(allGood ? '✓ All good — ready to trade.' : '✗ Fix the issues above before continuing.');
+  lines.push(allGood
+    ? '✓ Setup checks passed. Review risk gates before trading.'
+    : '✗ Fix the issues above before continuing.');
 
   return lines.join('\n');
 }
