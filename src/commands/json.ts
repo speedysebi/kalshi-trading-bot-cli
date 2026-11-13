@@ -15,6 +15,7 @@ export interface CLIResponse<T> {
       cash_balance: number;
       portfolio_value: number;
       open_exposure: number;
+      exposure_ratio?: number | null;
       available: number;
       positions_count: number;
     };

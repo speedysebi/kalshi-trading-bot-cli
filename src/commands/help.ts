@@ -50,7 +50,7 @@ Tip: ${p}similar walks the taxonomy from a ticker — same event, then series, t
 
     portfolio: `**${p}portfolio** — Account state
 
-${p}portfolio                    Full overview: positions, P&L, risk snapshot
+${p}portfolio                    Positions, P&L, exposure share, risk snapshot
 ${p}portfolio positions          Open positions with P&L
 ${p}portfolio orders             Resting orders
 ${p}portfolio balance            Account balance
