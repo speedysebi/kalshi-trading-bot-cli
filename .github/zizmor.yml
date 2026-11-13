@@ -1,0 +1,16 @@
+# zizmor configuration for this repository's own workflows.
+# https://docs.zizmor.sh/configuration/
+rules:
+  # Recommends `uses: $/...` for same-repo workflows (GitHub, July 2026), but
+  # actionlint 1.7.12 rejects that syntax. Re-enable once actionlint supports it.
+  self-repository:
+    disable: true
+
+  # node-ci.yml installs pnpm/yarn with npm when corepack is unavailable
+  # (Node 25+). The package manager itself can't come from a lockfile.
+  # zizmor doesn't honor inline ignore comments inside `run:` scripts.
+  adhoc-packages:
+    ignore:
+      - node-ci.yml
+      # Trusted Publishing needs an npm CLI newer than the Node runner bundles.
+      - publish-npm.yml

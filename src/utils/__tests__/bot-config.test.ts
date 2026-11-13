@@ -15,7 +15,11 @@ function runInTempHome(home: string): { threw: boolean; after: unknown } {
     try { setBotSetting('risk.kelly_multiplier', '0.25'); } catch { threw = true; }
     console.log('RESULT' + JSON.stringify({ threw, after: getBotSetting('risk.kelly_multiplier') }));
   `;
-  const proc = Bun.spawnSync(['bun', '-e', script], { env: { ...process.env, HOME: home } });
+  const proc = Bun.spawnSync(['bun', '-e', script], {
+    // os.homedir() reads USERPROFILE on Windows and HOME elsewhere; set both so
+    // the child never touches the real ~/.kalshi-bot/config.json.
+    env: { ...process.env, HOME: home, USERPROFILE: home },
+  });
   const line = proc.stdout.toString().split('\n').find((l) => l.startsWith('RESULT'));
   if (!line) throw new Error(`child produced no result: ${proc.stderr.toString().slice(0, 400)}`);
   return JSON.parse(line.slice('RESULT'.length));

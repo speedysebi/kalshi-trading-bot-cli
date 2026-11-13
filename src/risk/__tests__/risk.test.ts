@@ -120,6 +120,7 @@ describe('Kelly Sizing', () => {
     const result = await kellySize({
       edge: 0.10,
       marketProb: 0.50,
+      multiplier: 0.5,
     });
 
     // available = 100000 - 30000 = 70000
@@ -174,6 +175,7 @@ describe('Kelly Sizing', () => {
       edge: 0.15,
       marketProb: 0.50,
       market,
+      multiplier: 0.5,
     });
 
     expect(result.liquidityAdjusted).toBe(true);

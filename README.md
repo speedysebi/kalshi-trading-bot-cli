@@ -628,6 +628,14 @@ TELEMETRY_ENABLED=false bunx kalshi-trading-bot-cli@latest
 
 See the [User Guide](GUIDE.md) for detailed usage instructions, examples, and tips.
 
+The [trading bot readiness checklist](TRADING_BOT_READINESS.md) tracks the work and evidence needed before automated live trading. The linked [research report](reports/Trading%20bot%20readiness%20and%20Octagon%20replacement.md) covers backtesting data sources and an in-house Octagon replacement.
+
+### CI and releases
+
+GitHub Actions runs `bun run typecheck`, `bun test`, and an npm package dry run for pull requests and pushes to `main`. It also runs actionlint and zizmor when workflow files change. The reusable workflows are adapted locally from [cicd-template](https://github.com/speedysebi/cicd-template); the template is private and this repository is public, so GitHub cannot call it across repositories. Integration tests require live API credentials and are not part of this public CI job. Configure branch protection to require the CI and workflow-lint checks before merging.
+
+Releases are started manually with the **Release Tag** workflow on `main` after updating `package.json` and reviewing the changes. It reruns the checks and package dry run before creating a tag and dispatching **Publish to npm**. Publishing repeats typecheck and tests and verifies that the tag matches `package.json`. Dependabot proposes weekly GitHub Actions updates. Approve the version and release scope before starting the workflow; review the generated release notes afterward.
+
 ## Star History
 
 <a href="https://star-history.dera.page/#OctagonAI/kalshi-trading-bot-cli&type=date&legend=top-left">
