@@ -140,6 +140,8 @@ export interface PaperSummary {
   roi: number;
   wins: number;
   losses: number;
+  win_rate: number | null;
+  average_settled_pnl: number | null;
 }
 
 export function paperSummary(db: Database): PaperSummary {
@@ -155,8 +157,14 @@ export function paperSummary(db: Database): PaperSummary {
          COALESCE(SUM(status = 'settled' AND realized_pnl < 0), 0) AS losses
        FROM paper_positions`,
     )
-    .get() as Omit<PaperSummary, 'roi'>;
-  return { ...agg, roi: agg.capital_settled > 0 ? agg.realized_pnl / agg.capital_settled : 0 };
+    .get() as Omit<PaperSummary, 'roi' | 'win_rate' | 'average_settled_pnl'>;
+  const decided = agg.wins + agg.losses;
+  return {
+    ...agg,
+    roi: agg.capital_settled > 0 ? agg.realized_pnl / agg.capital_settled : 0,
+    win_rate: decided > 0 ? agg.wins / decided : null,
+    average_settled_pnl: agg.settled > 0 ? agg.realized_pnl / agg.settled : null,
+  };
 }
 
 export function listPaperPositions(db: Database, limit = 20): PaperPosition[] {
@@ -173,6 +181,12 @@ export function formatPaperHuman(rows: PaperPosition[], summary: PaperSummary, j
   lines.push(
     `${summary.open} open ($${summary.open_capital.toFixed(2)} at risk) · ${summary.settled} settled · ` +
     `realized ${summary.realized_pnl >= 0 ? '+' : ''}$${summary.realized_pnl.toFixed(2)} (${(summary.roi * 100).toFixed(1)}% ROI) · ${summary.wins}W/${summary.losses}L`,
+  );
+  lines.push(
+    `Win rate ${summary.win_rate === null ? '--' : `${(summary.win_rate * 100).toFixed(1)}%`} · ` +
+    `Avg settled P&L ${summary.average_settled_pnl === null
+      ? '--'
+      : `${summary.average_settled_pnl >= 0 ? '+' : ''}$${summary.average_settled_pnl.toFixed(2)}`}`,
   );
   if (rows.length === 0) {
     lines.push('');

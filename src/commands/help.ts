@@ -292,7 +292,8 @@ Entries use the same semantics as ${p}buy (market quote when no price) and
 capture the model's view at entry. Positions settle against real Kalshi
 results and are scored with the backtest's flat-bet definitions, so
 backtest → paper → live is one comparable chain. Paper entries auto-file
-hypotheses (source 'paper').`,
+hypotheses (source 'paper'). The ledger shows settled win rate and average
+P&L per settled position.`,
 
     mandate: `**${p}mandate** — Hard trading caps + kill switch
 

@@ -166,7 +166,7 @@ Markets in KXBTCD-26SEP1817 — 3 shown
 | `hypothesis` | Falsifiable-claim registry — executed trades auto-file claims, settlements auto-resolve them; add thematic claims manually |
 | `variants [backtest flags]` | Strategy-variant leaderboard — one signal pipeline segmented through named filters (side, edge band, price band, confidence), ranked by ROI/maxDD |
 | `daemon [once]` | Background maintenance loop: index refresh, Octagon prefetch, settlements sync, paper settlement, reflection — keeps caches warm off the critical path |
-| `paper buy/sell ...` / `paper` | Paper-trading ledger — forward-test with real entry quotes and real settlements, zero exchange risk; scored like the backtest |
+| `paper buy/sell ...` / `paper` | Paper-trading ledger — forward-test with real entry quotes and settlements; shows settled win rate and average P&L, with zero exchange risk |
 | `mandate` / `kill [reason]` / `resume` | Hard trading caps (per-order size/notional, daily realized loss) enforced at order placement, plus an instant halt |
 
 Learning-loop examples:
