@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { Database } from 'bun:sqlite';
 import { migrate } from '../../db/schema';
-import { openPaperPosition, settlePaperPositions, paperSummary, settlePnl, winningSide, listPaperPositions } from '../paper';
+import { openPaperPosition, settlePaperPositions, paperSummary, settlePnl, winningSide, listPaperPositions, formatPaperHuman } from '../paper';
 
 function freshDb() {
   const db = new Database(':memory:');
@@ -47,6 +47,26 @@ describe('paper ledger lifecycle', () => {
     openPaperPosition(db, { ticker: 'KX-T', action: 'buy', side: 'no', count: 1, priceCents: 60 });
     expect(await settlePaperPositions(db, async () => null)).toBe(0);
     expect(paperSummary(db).open).toBe(1);
+  });
+
+  test('reports decided win rate and average P&L across settled positions', async () => {
+    const db = freshDb();
+    openPaperPosition(db, { ticker: 'KX-W', action: 'buy', side: 'yes', count: 10, priceCents: 40 });
+    openPaperPosition(db, { ticker: 'KX-L', action: 'buy', side: 'yes', count: 10, priceCents: 40 });
+    await settlePaperPositions(db, async (ticker) => ticker === 'KX-W' ? 'yes' : 'no');
+
+    const summary = paperSummary(db);
+    expect(summary.win_rate).toBeCloseTo(0.5);
+    expect(summary.average_settled_pnl).toBeCloseTo(1);
+    expect(formatPaperHuman(listPaperPositions(db), summary, 2)).toContain('Win rate 50.0% · Avg settled P&L +$1.00');
+  });
+
+  test('shows no win rate or average before any settlement', () => {
+    const db = freshDb();
+    const summary = paperSummary(db);
+    expect(summary.win_rate).toBeNull();
+    expect(summary.average_settled_pnl).toBeNull();
+    expect(formatPaperHuman([], summary, 0)).toContain('Win rate -- · Avg settled P&L --');
   });
 });
 
