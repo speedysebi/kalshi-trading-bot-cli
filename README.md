@@ -191,6 +191,7 @@ kalshi hypothesis resolve 3 refuted "only one cut happened"
 | `cancel <order_id>` | Cancel a resting order |
 | `backtest` | Model accuracy scorecard + live edge scanner |
 | `portfolio` | Positions, P&L, risk snapshot |
+| `portfolio status` | Setup checks, explicit demo/live exchange mode, and local kill-switch state |
 | `setup` | Re-run setup wizard (inside TUI) |
 | `init` | Launch setup wizard from CLI (`kalshi init`) |
 | `clear-cache` | Delete local cache and rebuild (`kalshi clear-cache`) |
